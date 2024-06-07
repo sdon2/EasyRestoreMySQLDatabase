@@ -2,6 +2,8 @@
 using System;
 using System.IO;
 using System.Reflection;
+using CommandLine;
+using System.Collections.Generic;
 
 namespace EasyRestoreMySQLDatabase
 {
@@ -9,21 +11,12 @@ namespace EasyRestoreMySQLDatabase
     {
         static int Main(string[] args)
         {
-            string sqlFile;
-            string cs = "server=localhost;user=root;pwd=;";
-
-            if (args.Length != 0)
-            {
-                sqlFile = args[0];
-            } else
-            {
-                sqlFile = "backup.sql";
-            }            
-
             try
             {
-                RestoreDatabase(cs, sqlFile);
-                Console.WriteLine("Database successfully restored.");
+                CommandLine.Parser.Default.ParseArguments<Options>(args)
+                    .WithParsed(RunOptions)
+                    .WithNotParsed(HandleParseError);
+
                 return 0;
             }
             catch (Exception ex)
@@ -33,22 +26,28 @@ namespace EasyRestoreMySQLDatabase
             }
         }
 
-        static void RestoreDatabase(string constring, string file)
+        static void RunOptions(Options options)
         {
-            using (MySqlConnection conn = new MySqlConnection(constring))
+            using (MySqlConnection conn = new MySqlConnection(options.ConnectionString))
             {
                 using (MySqlCommand cmd = new MySqlCommand())
                 {
                     using (MySqlBackup mb = new MySqlBackup(cmd))
                     {
-                        string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                         cmd.Connection = conn;
                         conn.Open();
-                        mb.ImportFromFile(Path.Combine(dir, file));
+                        mb.ImportFromFile(options.SQLFile);
                         conn.Close();
                     }
                 }
             }
+
+            Console.WriteLine("Database successfully restored.");
+        }
+
+        static void HandleParseError(IEnumerable<Error> errs)
+        {            
+            //throw new Exception("Unable to proceed. There are errors in restoring SQL file.");
         }
     }
 }
